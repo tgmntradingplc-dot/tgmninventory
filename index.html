@@ -1,0 +1,848 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TGMN TRADING PLC | Stock & Inventory Management System</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+  @keyframes marquee {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+  }
+  .animate-marquee {
+    display: inline-block;
+    animation: marquee 25s linear infinite;
+  }
+</style>
+</head>
+<body class="text-slate-900 min-h-screen pb-12">
+
+  <!-- LOGIN SCREEN OVERLAY -->
+  <div id="loginScreen" class="fixed inset-0 bg-slate-950/95 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-slate-200">
+      <div class="flex flex-col items-center text-center mb-6">
+        <div class="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-3xl font-black text-white shadow-lg mb-3">
+          TT
+        </div>
+        <h2 class="text-2xl font-extrabold text-slate-900">TGMN TRADING PLC</h2>
+        <p class="text-xs text-slate-500 font-medium mt-1">Stock & Inventory Management System Login</p>
+      </div>
+
+      <form onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">User Role / የመግቢያ ደረጃ</label>
+          <select id="loginRole" class="w-full text-xs font-bold px-3.5 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50">
+            <option value="admin">🛡️ Admin (አድሚን - ሙሉ መብት ያለው)</option>
+            <option value="user">👤 End User (ኢንድ ዩዘር - ዕለታዊ ስራ)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Password / የይለፍ ቃል</label>
+          <input id="loginPassword" type="password" required placeholder="ፓስወርድ ያስገቡ..." class="w-full text-sm px-3.5 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+
+        <div id="loginError" class="hidden text-xs p-3 rounded-xl bg-red-50 text-red-700 border border-red-200 font-bold"></div>
+
+        <button type="submit" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm rounded-xl transition shadow-lg">
+          🔐 ግባ (Login)
+        </button>
+      </form>
+
+      <div class="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-500 bg-slate-50 p-3.5 rounded-xl space-y-1">
+        <p class="font-bold text-slate-700">መነሻ ፓስወርዶች (Default Passwords):</p>
+        <p>• <b>Admin:</b> <code class="bg-white px-1.5 py-0.5 rounded border text-slate-800 font-bold">admin123</code></p>
+        <p>• <b>End User:</b> <code class="bg-white px-1.5 py-0.5 rounded border text-slate-800 font-bold">user123</code></p>
+        <p class="text-[10px] text-slate-400 pt-1">* አድሚን ከገባ በኋላ ሁለቱንም ፓስወርዶች መቀየር ይችላል።</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASSWORD SETTINGS MODAL (ADMIN ONLY) -->
+  <div id="passwordModal" class="fixed inset-0 bg-slate-900/75 backdrop-blur-xs z-40 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+      <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+        <h3 class="font-extrabold text-slate-900 text-base">🔑 የፓስወርድ ማስተካከያ (Admin Settings)</h3>
+        <button onclick="closePasswordModal()" class="text-slate-400 hover:text-slate-700 font-bold text-lg">✕</button>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">New Admin Password (አዲስ የአድሚን ፓስወርድ)</label>
+          <input id="newAdminPass" type="text" placeholder="ባዶ ከተዉት አይቀየርም" class="w-full text-xs px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">New End User Password (አዲስ የኢንድ ዩዘር ፓስወርድ)</label>
+          <input id="newUserPass" type="text" placeholder="ባዶ ከተዉት አይቀየርም" class="w-full text-xs px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div id="passModalStatus" class="hidden text-xs p-2.5 rounded-xl font-bold"></div>
+        <div class="flex gap-2 pt-2">
+          <button onclick="savePasswords()" class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl transition">💾 ፓስወርድ አስቀምጥ</button>
+          <button onclick="closePasswordModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition">ዝጋ</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Marquee Banner -->
+  <div class="bg-blue-600 text-white text-xs font-bold py-2 overflow-hidden whitespace-nowrap shadow-inner">
+    <div class="animate-marquee">
+      🔥 TGMN TRADING PLC STOCK & INVENTORY MANAGEMENT SYSTEM 🔥
+    </div>
+  </div>
+  <!-- Header -->
+  <header class="bg-slate-900 text-white shadow-xl border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-2xl font-black text-white shadow-lg">
+          TT
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-extrabold tracking-tight">TGMN TRADING PLC</h1>
+            <span id="roleBadge" class="text-[10px] px-2.5 py-0.5 rounded-full font-extrabold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Admin</span>
+          </div>
+          <p class="text-xs text-slate-400">Automated Stock Inventory & Trade Ledger System</p>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="btnDemoData" onclick="loadDemoData()" class="admin-only px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition shadow-sm">⚡ Load Demo Data</button>
+        <button onclick="exportCSV('inventory')" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition shadow-sm">⬇ Export Inventory</button>
+        <button onclick="exportCSV('transactions')" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition shadow-sm">⬇ Export Trade Log</button>
+        <button id="btnPassSettings" onclick="openPasswordModal()" class="admin-only px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl transition shadow-sm">🔑 Passwords</button>
+        <button onclick="logout()" class="px-3.5 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl transition shadow-sm">🚪 ውጣ (Logout)</button>
+      </div>
+    </div>
+  </header>
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-6 mt-8">
+    <!-- Overview Stats Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-2 h-full bg-slate-900"></div>
+        <p class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Product Types</p>
+        <h3 id="productsCount" class="text-3xl font-black text-slate-900 mt-2">0</h3>
+        <p class="text-xs text-slate-500 mt-1 font-medium">Distinct items cataloged</p>
+      </div>
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-2 h-full bg-blue-600"></div>
+        <p class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Total Units in Stock</p>
+        <h3 id="totalUnitsCount" class="text-3xl font-black text-slate-900 mt-2">0</h3>
+        <p class="text-xs text-slate-500 mt-1 font-medium">Aggregate inventory quantity</p>
+      </div>
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-2 h-full bg-amber-500"></div>
+        <p class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Low Stock Alerts</p>
+        <h3 id="lowCount" class="text-3xl font-black text-amber-600 mt-2">0</h3>
+        <p class="text-xs text-slate-500 mt-1 font-medium">Items at or below threshold</p>
+      </div>
+    </div>
+    <!-- Controls & Data Layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <!-- Left Column: Controls & Upload (5 Cols) -->
+      <div class="lg:col-span-5 space-y-6">
+        <!-- Upload Panel -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="font-extrabold text-slate-900 text-base">Excel File Import</h3>
+            <span class="text-[10px] bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-extrabold border border-blue-200">Smart Parser</span>
+          </div>
+          <!-- Mode Select -->
+          <div id="modeGrid" class="grid grid-cols-3 gap-1.5 bg-slate-100 p-1.5 rounded-xl mb-5 text-xs font-bold">
+            <button id="btn-mode-purchase" onclick="setImportMode('purchase')" class="py-2.5 rounded-lg bg-emerald-600 text-white shadow-sm transition">➕ Purchase</button>
+            <button id="btn-mode-sales" onclick="setImportMode('sales')" class="py-2.5 rounded-lg text-slate-600 hover:text-slate-900 transition">➖ Sales</button>
+            <button id="btn-mode-master" onclick="setImportMode('master')" class="admin-only py-2.5 rounded-lg text-slate-600 hover:text-slate-900 transition">📦 Master Stock</button>
+          </div>
+          <!-- Dropzone -->
+          <label class="border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 rounded-2xl p-8 text-center block cursor-pointer transition relative group">
+            <div class="text-4xl mb-2 group-hover:scale-110 transition">📁</div>
+            <strong id="dropTitle" class="block text-sm font-bold text-slate-900">Upload Purchase Excel File (.xlsx, .csv)</strong>
+            <span id="dropDesc" class="text-xs text-slate-500 block mt-1">Automatically increases stock quantities on upload</span>
+            <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" class="hidden">
+          </label>
+          <p id="modeNotice" class="text-xs text-slate-600 mt-4 bg-slate-50 p-3 rounded-xl border border-slate-200 font-medium leading-relaxed">
+            💡 <b>Purchase Mode:</b> Smart-detects item names, units of measure, and quantities to automatically increase stock levels.
+          </p>
+          <div id="importStatus" class="mt-3 text-xs p-3 rounded-xl hidden font-semibold"></div>
+        </div>
+        <!-- Add Manual Product Panel -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 class="font-extrabold text-slate-900 text-base mb-4">Add New Product Manually</h3>
+          <div class="space-y-3.5">
+            <div>
+              <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Product Description</label>
+              <input id="newName" type="text" placeholder="e.g. Steel Purlin 7*5" class="w-full text-xs px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Initial Qty</label>
+                <input id="newQty" type="number" min="0" placeholder="0" class="w-full text-xs px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Unit of Measure</label>
+                <input id="newUnit" type="text" placeholder="Pcs / Pkt / Roll / Kg" class="w-full text-xs px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Low Stock Threshold</label>
+              <input id="newThreshold" type="number" value="5" class="w-full text-xs px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <button onclick="addProduct()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl transition shadow-md">＋ Save New Product</button>
+            <div id="addStatus" class="text-xs p-2.5 rounded-xl hidden"></div>
+          </div>
+        </div>
+        <!-- Manual Transaction Panel -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 class="font-extrabold text-slate-900 text-base mb-4">Record Direct Transaction</h3>
+          <div class="space-y-3.5">
+            <div>
+              <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Select Product</label>
+              <select id="txProduct" class="w-full text-xs px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                <option value="">Choose item...</option>
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Transaction Type</label>
+                <select id="txType" class="w-full text-xs px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                  <option value="purchase">Purchase (Add Stock)</option>
+                  <option value="sale">Sale (Deduct Stock)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Quantity</label>
+                <input id="txQty" type="number" min="1" placeholder="1" class="w-full text-xs px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Supplier / Client Note</label>
+              <input id="txParty" type="text" placeholder="e.g. TGMN Trading" class="w-full text-xs px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <button onclick="recordTransaction()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition shadow-md">💾 Save Transaction</button>
+            <div id="txStatus" class="text-xs p-2.5 rounded-xl hidden"></div>
+          </div>
+        </div>
+      </div>
+      <!-- Right Column: Tables (7 Cols) -->
+      <div class="lg:col-span-7 space-y-6">
+        <!-- Stock Inventory Table -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">
+            <h3 class="font-extrabold text-slate-900 text-base">Current Stock Inventory</h3>
+            <input id="search" type="text" placeholder="🔍 Search stock..." oninput="renderInventory()" class="text-xs px-3.5 py-2 border border-slate-300 rounded-xl outline-none w-full sm:w-56 focus:ring-2 focus:ring-blue-500">
+          </div>
+          <!-- Stock Filter Tabs -->
+          <div class="flex gap-2 mb-4 border-b border-slate-200 pb-3 text-xs font-bold">
+            <button id="stock-filter-all" onclick="setStockFilter('all')" class="px-3.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 transition">All Items</button>
+            <button id="stock-filter-low" onclick="setStockFilter('low')" class="px-3.5 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 transition">⚠️ Low Stock</button>
+            <button id="stock-filter-in" onclick="setStockFilter('in')" class="px-3.5 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 transition">✅ In Stock</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-200 uppercase tracking-wider">
+                  <th class="p-3">Product Description</th>
+                  <th class="p-3">Unit</th>
+                  <th class="p-3">Stock Qty</th>
+                  <th class="p-3">Status</th>
+                  <th id="thAction" class="p-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="inventoryRows" class="divide-y divide-slate-100">
+                <tr><td colspan="5" class="p-8 text-center text-slate-400 italic">No products recorded yet. Upload an Excel file or add manually.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <!-- Transactions History Table -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="flex justify-between items-center mb-5">
+            <h3 class="font-extrabold text-slate-900 text-base">Transaction Audit History</h3>
+            <div class="flex items-center gap-2.5">
+              <select id="filterTxType" onchange="renderTransactions()" class="text-xs px-3 py-1.5 border border-slate-300 rounded-xl bg-white outline-none">
+                <option value="all">All Transactions</option>
+                <option value="purchase">Purchases Only</option>
+                <option value="sale">Sales Only</option>
+              </select>
+              <button id="btnClearLog" onclick="confirmClearTransactions()" class="admin-only text-xs text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-xl transition font-bold border border-red-200">Clear Log</button>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-200 uppercase tracking-wider">
+                  <th class="p-3">Date & Time</th>
+                  <th class="p-3">Product Description</th>
+                  <th class="p-3">Unit</th>
+                  <th class="p-3">Type</th>
+                  <th class="p-3">Qty</th>
+                  <th class="p-3">Reference / Party</th>
+                </tr>
+              </thead>
+              <tbody id="transactionRows" class="divide-y divide-slate-100">
+                <tr><td colspan="6" class="p-8 text-center text-slate-400 italic">No transaction history recorded yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script>
+    const KEY = 'TGMN_trading_stock_v6';
+    const TXKEY = 'TGMN_trading_tx_v6';
+    const UPLOADED_FILES_KEY = 'TGMN_uploaded_files_v6';
+    const AUTH_PASS_KEY = 'TGMN_auth_passwords_v1';
+    const SESSION_ROLE_KEY = 'TGMN_current_role_v1';
+
+    let stock = JSON.parse(localStorage.getItem(KEY) || '{}');
+    let transactions = JSON.parse(localStorage.getItem(TXKEY) || '[]');
+    let uploadedFiles = JSON.parse(localStorage.getItem(UPLOADED_FILES_KEY) || '[]');
+    let passwords = JSON.parse(localStorage.getItem(AUTH_PASS_KEY) || '{"admin":"admin123","user":"user123"}');
+    let currentRole = sessionStorage.getItem(SESSION_ROLE_KEY) || null;
+    let currentImportMode = 'purchase';
+    let stockFilter = 'all';
+
+    // Authentication & Role Permissions
+    function applyRolePermissions() {
+      const loginScreen = document.getElementById('loginScreen');
+      if (!currentRole) {
+        loginScreen.classList.remove('hidden');
+        return;
+      }
+      loginScreen.classList.add('hidden');
+
+      const isAdmin = currentRole === 'admin';
+      const badge = document.getElementById('roleBadge');
+      if (isAdmin) {
+        badge.textContent = '🛡️ Admin';
+        badge.className = 'text-[10px] px-2.5 py-0.5 rounded-full font-extrabold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30';
+      } else {
+        badge.textContent = '👤 End User';
+        badge.className = 'text-[10px] px-2.5 py-0.5 rounded-full font-extrabold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30';
+      }
+
+      document.querySelectorAll('.admin-only').forEach(el => {
+        el.style.display = isAdmin ? '' : 'none';
+      });
+
+      const modeGrid = document.getElementById('modeGrid');
+      if (isAdmin) {
+        modeGrid.className = 'grid grid-cols-3 gap-1.5 bg-slate-100 p-1.5 rounded-xl mb-5 text-xs font-bold';
+      } else {
+        modeGrid.className = 'grid grid-cols-2 gap-1.5 bg-slate-100 p-1.5 rounded-xl mb-5 text-xs font-bold';
+        if (currentImportMode === 'master') setImportMode('purchase');
+      }
+
+      const thAction = document.getElementById('thAction');
+      if (thAction) thAction.style.display = isAdmin ? '' : 'none';
+
+      render();
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const role = document.getElementById('loginRole').value;
+      const pass = document.getElementById('loginPassword').value;
+      const errEl = document.getElementById('loginError');
+
+      if (pass === passwords[role]) {
+        currentRole = role;
+        sessionStorage.setItem(SESSION_ROLE_KEY, role);
+        document.getElementById('loginPassword').value = '';
+        errEl.classList.add('hidden');
+        applyRolePermissions();
+      } else {
+        errEl.textContent = '❌ ያስገቡት ፓስወርድ የተሳሳተ ነው! እባክዎ ደግመው ይሞክሩ።';
+        errEl.classList.remove('hidden');
+      }
+    }
+
+    function logout() {
+      currentRole = null;
+      sessionStorage.removeItem(SESSION_ROLE_KEY);
+      applyRolePermissions();
+    }
+
+    function openPasswordModal() {
+      if (currentRole !== 'admin') return;
+      document.getElementById('newAdminPass').value = '';
+      document.getElementById('newUserPass').value = '';
+      document.getElementById('passModalStatus').classList.add('hidden');
+      const modal = document.getElementById('passwordModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closePasswordModal() {
+      const modal = document.getElementById('passwordModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function savePasswords() {
+      if (currentRole !== 'admin') return;
+      const newAdmin = clean(document.getElementById('newAdminPass').value);
+      const newUser = clean(document.getElementById('newUserPass').value);
+      const statusEl = document.getElementById('passModalStatus');
+
+      if (!newAdmin && !newUser) {
+        statusEl.textContent = '⚠️ እባክዎ ቢያንስ አንድ አዲስ ፓስወርድ ያስገቡ።';
+        statusEl.className = 'text-xs p-2.5 rounded-xl font-bold block bg-red-50 text-red-700 border border-red-200';
+        return;
+      }
+      if (newAdmin) passwords.admin = newAdmin;
+      if (newUser) passwords.user = newUser;
+
+      localStorage.setItem(AUTH_PASS_KEY, JSON.stringify(passwords));
+      statusEl.textContent = '✅ ፓስወርዶቹ በተሳካ ሁኔታ ተቀይረዋል!';
+      statusEl.className = 'text-xs p-2.5 rounded-xl font-bold block bg-emerald-50 text-emerald-700 border border-emerald-200';
+      setTimeout(closePasswordModal, 1500);
+    }
+
+    function persist() {
+      localStorage.setItem(KEY, JSON.stringify(stock));
+      localStorage.setItem(TXKEY, JSON.stringify(transactions));
+      localStorage.setItem(UPLOADED_FILES_KEY, JSON.stringify(uploadedFiles));
+      render();
+    }
+
+    async function computeFileHash(buffer) {
+      if (window.crypto && window.crypto.subtle) {
+        const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+      const bytes = new Uint8Array(buffer);
+      let hash = 0;
+      for (let i = 0; i < bytes.length; i++) {
+        hash = ((hash << 5) - hash) + bytes[i];
+        hash |= 0;
+      }
+      return 'fallback_' + bytes.length + '_' + hash;
+    }
+
+    function clean(s) {
+      return String(s || '').trim();
+    }
+    function findKey(name) {
+      if (!name) return null;
+      const target = clean(name).toLowerCase();
+      return Object.keys(stock).find(k => k.toLowerCase() === target);
+    }
+    function msg(id, text, isError = false) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = text;
+      el.className = `mt-3 text-xs p-3.5 rounded-xl font-bold block ${isError ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`;
+      setTimeout(() => { el.className = 'hidden'; }, 8000);
+    }
+    function setImportMode(mode) {
+      if (mode === 'master' && currentRole !== 'admin') return;
+      currentImportMode = mode;
+      const bPur = document.getElementById('btn-mode-purchase');
+      const bSal = document.getElementById('btn-mode-sales');
+      const bMas = document.getElementById('btn-mode-master');
+      [bPur, bSal, bMas].forEach(b => b.className = "py-2.5 rounded-lg text-slate-600 hover:text-slate-900 transition font-bold");
+      if (currentRole !== 'admin') bMas.style.display = 'none';
+      const title = document.getElementById('dropTitle');
+      const desc = document.getElementById('dropDesc');
+      const notice = document.getElementById('modeNotice');
+      if (mode === 'purchase') {
+        bPur.className = "py-2.5 rounded-lg bg-emerald-600 text-white shadow-sm transition font-bold";
+        title.textContent = "Upload Purchase Excel File (.xlsx, .csv)";
+        desc.textContent = "Automatically increases stock quantities on upload";
+        notice.innerHTML = "💡 <b>Purchase Mode:</b> Smart-detects item names, units, and quantities to automatically increase stock levels.";
+      } else if (mode === 'sales') {
+        bSal.className = "py-2.5 rounded-lg bg-blue-600 text-white shadow-sm transition font-bold";
+        title.textContent = "Upload Sales Excel File (.xlsx, .csv)";
+        desc.textContent = "Automatically deducts sold items from stock inventory";
+        notice.innerHTML = "💡 <b>Sales Mode:</b> Subtracts sold quantities from stock levels and logs entries in the trade history.";
+      } else {
+        bMas.className = "py-2.5 rounded-lg bg-slate-800 text-white shadow-sm transition font-bold";
+        title.textContent = "Upload Master Stock File";
+        desc.textContent = "Initializes or overwrites baseline inventory balances";
+        notice.innerHTML = "💡 <b>Master Stock Mode:</b> Resets or sets total baseline stock quantities directly from file rows.";
+      }
+    }
+    function setStockFilter(filter) {
+      stockFilter = filter;
+      ['all', 'low', 'in'].forEach(f => {
+        const btn = document.getElementById(`stock-filter-${f}`);
+        if (f === filter) {
+          btn.className = "px-3.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 font-extrabold transition";
+        } else {
+          btn.className = "px-3.5 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 font-bold transition";
+        }
+      });
+      renderInventory();
+    }
+    function addProduct() {
+      const name = clean(document.getElementById('newName').value);
+      const qty = Number(document.getElementById('newQty').value || 0);
+      const unit = clean(document.getElementById('newUnit').value) || 'Pcs';
+      const threshold = Number(document.getElementById('newThreshold').value || 5);
+      if (!name) {
+        msg('addStatus', 'Please enter a valid product description.', true);
+        return;
+      }
+      const existingKey = findKey(name);
+      if (existingKey) {
+        stock[existingKey].qty += qty;
+        stock[existingKey].unit = unit;
+        stock[existingKey].threshold = threshold;
+        msg('addStatus', `Product "${existingKey}" updated successfully! (+${qty} added)`);
+      } else {
+        stock[name] = { qty, unit, threshold };
+        msg('addStatus', `New product "${name}" added successfully!`);
+      }
+      persist();
+      document.getElementById('newName').value = '';
+      document.getElementById('newQty').value = '';
+      document.getElementById('newUnit').value = '';
+    }
+    function recordTransaction() {
+      const name = document.getElementById('txProduct').value;
+      const type = document.getElementById('txType').value;
+      const qty = Number(document.getElementById('txQty').value);
+      const party = clean(document.getElementById('txParty').value);
+      if (!name || isNaN(qty) || qty <= 0) {
+        msg('txStatus', 'Please select a product and enter a valid quantity.', true);
+        return;
+      }
+      const key = findKey(name);
+      if (!key) return;
+      if (type === 'sale' && stock[key].qty < qty) {
+        msg('txStatus', `Insufficient stock! Available stock: ${stock[key].qty} ${stock[key].unit || 'Pcs'}`, true);
+        return;
+      }
+      stock[key].qty += type === 'purchase' ? qty : -qty;
+      transactions.unshift({
+        id: Date.now(),
+        date: new Date().toLocaleString('en-US'),
+        name: key,
+        unit: stock[key].unit || 'Pcs',
+        type,
+        qty,
+        party: `${party || (type === 'purchase' ? 'Supplier' : 'Customer')} [${currentRole === 'admin' ? 'Admin' : 'User'}]`
+      });
+      document.getElementById('txQty').value = '';
+      document.getElementById('txParty').value = '';
+      persist();
+      msg('txStatus', `${type === 'purchase' ? 'Purchase' : 'Sale'} transaction recorded successfully!`);
+    }
+    function quickAdjust(name, amount) {
+      if (currentRole !== 'admin') {
+        alert('ይህ ተግባር ለአድሚን (Admin) ብቻ የተፈቀደ ነው።');
+        return;
+      }
+      const key = findKey(name);
+      if (!key) return;
+      if (amount < 0 && stock[key].qty + amount < 0) {
+        alert('Stock cannot be negative.');
+        return;
+      }
+      stock[key].qty += amount;
+      transactions.unshift({
+        id: Date.now(),
+        date: new Date().toLocaleString('en-US'),
+        name: key,
+        unit: stock[key].unit || 'Pcs',
+        type: amount > 0 ? 'purchase' : 'sale',
+        qty: Math.abs(amount),
+        party: 'Direct Adjustment (+/-) [Admin]'
+      });
+      persist();
+    }
+    function deleteProduct(name) {
+      if (currentRole !== 'admin') {
+        alert('ዕቃዎችን መሰረዝ የሚችለው አድሚን (Admin) ብቻ ነው።');
+        return;
+      }
+      if (confirm(`Are you sure you want to delete "${name}" from inventory?`)) {
+        delete stock[name];
+        persist();
+      }
+    }
+    function renderInventory() {
+      const isAdmin = currentRole === 'admin';
+      const q = clean(document.getElementById('search').value).toLowerCase();
+      let entries = Object.entries(stock).filter(([n]) => n.toLowerCase().includes(q));
+      if (stockFilter === 'low') {
+        entries = entries.filter(([, v]) => v.qty <= (v.threshold || 5));
+      } else if (stockFilter === 'in') {
+        entries = entries.filter(([, v]) => v.qty > (v.threshold || 5));
+      }
+      const tbody = document.getElementById('inventoryRows');
+      if (!entries.length) {
+        tbody.innerHTML = `<tr><td colspan="${isAdmin ? 5 : 4}" class="p-8 text-center text-slate-400 italic">No matching products found.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = entries.map(([n, v]) => {
+        const threshold = v.threshold || 5;
+        let badge = '<span class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full text-[10px] font-extrabold">In Stock</span>';
+        if (v.qty <= 0) {
+          badge = '<span class="bg-red-100 text-red-800 px-2.5 py-1 rounded-full text-[10px] font-extrabold">Out of Stock (0)</span>';
+        } else if (v.qty <= threshold) {
+          badge = `<span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full text-[10px] font-extrabold">Low Stock (≤${threshold})</span>`;
+        }
+        const safeName = JSON.stringify(n).replace(/"/g, '&quot;');
+        const qtyCell = isAdmin
+          ? `<div class="flex items-center gap-2">
+               <button onclick="quickAdjust(${safeName}, -1)" class="w-6 h-6 bg-slate-200 hover:bg-slate-300 rounded-lg font-bold flex items-center justify-center transition">-</button>
+               <span class="font-black text-slate-900 w-9 text-center">${v.qty}</span>
+               <button onclick="quickAdjust(${safeName}, 1)" class="w-6 h-6 bg-slate-200 hover:bg-slate-300 rounded-lg font-bold flex items-center justify-center transition">+</button>
+             </div>`
+          : `<span class="font-black text-slate-900">${v.qty}</span>`;
+        const actionCell = isAdmin
+          ? `<td class="p-3 text-right">
+               <button onclick="deleteProduct(${safeName})" class="text-red-600 hover:bg-red-50 px-2.5 py-1.5 rounded-xl font-extrabold transition">Delete</button>
+             </td>`
+          : '';
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="p-3 font-extrabold text-slate-800">${n}</td>
+            <td class="p-3 font-bold text-slate-600 bg-slate-50/50">${v.unit || 'Pcs'}</td>
+            <td class="p-3">${qtyCell}</td>
+            <td class="p-3">${badge}</td>
+            ${actionCell}
+          </tr>
+        `;
+      }).join('');
+    }
+    function renderTransactions() {
+      const filter = document.getElementById('filterTxType').value;
+      let list = transactions;
+      if (filter !== 'all') {
+        list = transactions.filter(t => t.type === filter);
+      }
+      const tbody = document.getElementById('transactionRows');
+      if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400 italic">No transaction history recorded yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = list.slice(0, 50).map(t => {
+        const stockKey = findKey(t.name);
+        const unit = t.unit || (stockKey && stock[stockKey].unit) || 'Pcs';
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="p-3 text-slate-500 font-medium">${t.date}</td>
+            <td class="p-3 font-extrabold text-slate-800">${t.name}</td>
+            <td class="p-3 font-bold text-slate-600 bg-slate-50/50">${unit}</td>
+            <td class="p-3">
+              ${t.type === 'purchase' ? '<span class="text-emerald-700 font-extrabold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">➕ Purchase</span>' : '<span class="text-blue-700 font-extrabold bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">➖ Sale</span>'}
+            </td>
+            <td class="p-3 font-extrabold">${t.qty}</td>
+            <td class="p-3 text-slate-500 font-medium">${t.party || '-'}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+    function render() {
+      const vals = Object.values(stock);
+      const totalProducts = vals.length;
+      const totalUnits = vals.reduce((a, b) => a + Number(b.qty || 0), 0);
+      const lowCount = vals.filter(v => v.qty <= (v.threshold || 5)).length;
+      document.getElementById('productsCount').textContent = totalProducts;
+      document.getElementById('totalUnitsCount').textContent = totalUnits.toLocaleString();
+      document.getElementById('lowCount').textContent = lowCount;
+      const sel = document.getElementById('txProduct');
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">Choose item...</option>' + 
+        Object.keys(stock).map(n => `<option value="${n}">${n} (Stock: ${stock[n].qty} ${stock[n].unit || 'Pcs'})</option>`).join('');
+      if (stock[cur]) sel.value = cur;
+      renderInventory();
+      renderTransactions();
+    }
+    // Smart File Parser for ERCA & General Formats
+    document.getElementById('excelFile').addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (!window.XLSX) {
+        msg('importStatus', 'Excel parsing library missing.', true);
+        e.target.value = '';
+        return;
+      }
+      try {
+        const data = await file.arrayBuffer();
+        const fileHash = await computeFileHash(data);
+
+        // Check for duplicate purchase or sales file upload
+        if (currentImportMode === 'purchase' || currentImportMode === 'sales') {
+          const isDuplicate = uploadedFiles.some(
+            item => item.mode === currentImportMode && (item.hash === fileHash || (item.name === file.name && item.size === file.size && item.lastModified === file.lastModified))
+          );
+          if (isDuplicate) {
+            const typeLabel = currentImportMode === 'purchase' ? 'ፐርቸዝ (Purchase)' : 'ሴልስ (Sales)';
+            const alertMessage = `⚠️ ይህ ${typeLabel} ፋይል ከዚህ በፊት የተመዘገበ ስለሆነ ለሁለተኛ ጊዜ ተመሳሳይ ፐርቸዝ ወይም ሴልስ አፕሎድ ማድረግ አትችልም!`;
+            msg('importStatus', alertMessage, true);
+            alert(alertMessage);
+            e.target.value = '';
+            return;
+          }
+        }
+
+        const wb = XLSX.read(data, { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        let rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        
+        if (rows.length === 0 || (!rows[0]['Description.This field is mandatory.'] && !rows[0]['Item Description'])) {
+          rows = XLSX.utils.sheet_to_json(sheet, { range: 3, defval: '' });
+        }
+        if (!rows.length) throw new Error('Uploaded file contains no data rows.');
+        let updated = 0, added = 0, skipped = 0;
+        const timestamp = new Date().toLocaleString('en-US');
+        const unitMap = { 2: 'KG', 3: 'ML', 4: 'GM', 5: 'LIT', 6: 'MT', 7: 'Pcs', 8: 'CT', 9: 'Other', 10: 'Pc' };
+        const roleTag = currentRole === 'admin' ? 'Admin' : 'User';
+
+        rows.forEach(r => {
+          let name = '';
+          let qty = 0;
+          let unit = 'Pcs';
+          Object.keys(r).forEach(k => {
+            const keyLower = k.toLowerCase();
+            const val = r[k];
+            if (keyLower.includes('description') || keyLower.includes('item description') || keyLower.includes('particulars')) {
+              if (!name) name = clean(val);
+            }
+            if (keyLower.includes('quantity') || keyLower.includes('sold quqntity') || keyLower.includes('qty')) {
+              const parsed = parseFloat(String(val).replace(/,/g, ''));
+              if (!isNaN(parsed)) qty = parsed;
+            }
+            if (keyLower.includes('unit of measure') || keyLower.includes('uom')) {
+              if (val !== undefined && val !== '') {
+                let uCode = Number(val);
+                unit = unitMap[uCode] || clean(val);
+              }
+            }
+          });
+          if (!name || isNaN(qty) || qty <= 0) {
+            skipped++;
+            return;
+          }
+          let key = findKey(name);
+          if (currentImportMode === 'master') {
+            if (currentRole !== 'admin') return;
+            if (key) {
+              stock[key].qty = qty;
+              stock[key].unit = unit;
+              updated++;
+            } else {
+              stock[name] = { qty, unit, threshold: 5 };
+              added++;
+            }
+          } 
+          else if (currentImportMode === 'purchase') {
+            if (!key) {
+              stock[name] = { qty: 0, unit, threshold: 5 };
+              key = name;
+              added++;
+            } else {
+              if (unit) stock[key].unit = unit;
+              updated++;
+            }
+            stock[key].qty += qty;
+            transactions.unshift({
+              id: Date.now() + Math.random(),
+              date: timestamp,
+              name: key,
+              unit: stock[key].unit || unit,
+              type: 'purchase',
+              qty: qty,
+              party: `Excel Purchase Upload (${file.name}) [${roleTag}]`
+            });
+          } 
+          else if (currentImportMode === 'sales') {
+            if (!key) {
+              stock[name] = { qty: 0, unit, threshold: 5 };
+              key = name;
+              added++;
+            } else {
+              if (unit) stock[key].unit = unit;
+              updated++;
+            }
+            stock[key].qty -= qty;
+            transactions.unshift({
+              id: Date.now() + Math.random(),
+              date: timestamp,
+              name: key,
+              unit: stock[key].unit || unit,
+              type: 'sale',
+              qty: qty,
+              party: `Excel Sales Upload (${file.name}) [${roleTag}]`
+            });
+          }
+        });
+
+        if (currentImportMode === 'purchase' || currentImportMode === 'sales') {
+          uploadedFiles.push({
+            hash: fileHash,
+            name: file.name,
+            size: file.size,
+            lastModified: file.lastModified,
+            mode: currentImportMode,
+            uploadedAt: timestamp
+          });
+        }
+
+        persist();
+        msg('importStatus', `File imported successfully! (${added} new items added, ${updated} items updated)`);
+      } catch (err) {
+        msg('importStatus', 'Failed to parse file: ' + err.message, true);
+      }
+      e.target.value = '';
+    });
+    function loadDemoData() {
+      if (currentRole !== 'admin') return;
+      stock = {
+        "Steel Purlin 7*5": { qty: 150, unit: "Pcs", threshold: 20 },
+        "Steel Nails *6cm": { qty: 85, unit: "Pkt", threshold: 15 },
+        "Black Wire 2.5mm": { qty: 4, unit: "Pcs", threshold: 10 },
+        "Measuring Tape 10M": { qty: 25, unit: "Pcs", threshold: 5 }
+      };
+      transactions = [
+        { id: 1, date: new Date().toLocaleString('en-US'), name: "Steel Purlin 7*5", unit: "Pcs", type: "purchase", qty: 150, party: "Initial Stock" },
+        { id: 2, date: new Date().toLocaleString('en-US'), name: "Steel Nails *6cm", unit: "Pkt", type: "sale", qty: 3, party: "October Sales" }
+      ];
+      persist();
+      msg('addStatus', 'Demo data loaded successfully!');
+    }
+    function exportCSV(type) {
+      let lines = [];
+      let filename = '';
+      if (type === 'inventory') {
+        filename = `TGMN_TRADING_Inventory_${new Date().toISOString().slice(0,10)}.csv`;
+        lines.push(['Item Description', 'Unit', 'Stock Qty']);
+        Object.entries(stock).forEach(([n, v]) => {
+          lines.push([n, v.unit || 'Pcs', v.qty]);
+        });
+      } else {
+        filename = `TGMN_TRADING_Transactions_${new Date().toISOString().slice(0,10)}.csv`;
+        lines.push(['Date Time', 'Item Description', 'Unit', 'Type', 'Quantity', 'Note']);
+        transactions.forEach(t => {
+          const stockKey = findKey(t.name);
+          const unit = t.unit || (stockKey && stock[stockKey].unit) || 'Pcs';
+          lines.push([t.date, t.name, unit, t.type, t.qty, t.party || '']);
+        });
+      }
+      const csv = lines.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+    }
+    function confirmClearTransactions() {
+      if (currentRole !== 'admin') return;
+      if (confirm('Are you sure you want to clear the transaction history log? Stock inventory will remain unaffected.')) {
+        transactions = [];
+        persist();
+      }
+    }
+    applyRolePermissions();
+  </script>
+</body>
+</html>
